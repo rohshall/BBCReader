@@ -1,0 +1,8 @@
+bin
+*~
+*.bak
+Thumbs.db
+*.class
+*.DS_Store
+local.properties
+gen
