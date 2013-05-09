@@ -18,6 +18,8 @@ import android.content.Context;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.LayoutInflater;
+import android.graphics.BitmapFactory;
+import android.graphics.Bitmap;
 import android.widget.TextView;
 import android.widget.ImageView;
 import android.widget.ListView;
@@ -42,7 +44,6 @@ class ArticleAdapter extends BaseAdapter {
 
     private Context context;
     private ArrayList<HashMap<String, String>> articles;
-    private final ImageDownloader imageDownloader = new ImageDownloader();
 
     public ArticleAdapter(final Context context, ArrayList<HashMap<String, String>> articles) {
         this.context = context;
@@ -87,11 +88,15 @@ class ArticleAdapter extends BaseAdapter {
         String description = article.get("description");
         holder.description_text.setText(description);
         String thumbnail_uri = article.get("thumbnail");
+        Bitmap thumbnail = null;
         if (thumbnail_uri != null) {
-            imageDownloader.download(thumbnail_uri, holder.thumbnail_image);
-        } else {
-            holder.thumbnail_image.setImageBitmap(null);
+            try {
+                thumbnail = BitmapFactory.decodeStream(new URL(thumbnail_uri).openConnection().getInputStream());
+            } catch (Exception e) {
+                // Just absorb the image download error
+            }
         }
+        holder.thumbnail_image.setImageBitmap(thumbnail);
         return convertView;
     }
 }
@@ -106,11 +111,11 @@ public class BBCReaderActivity extends Activity {
 
     private static final String TAG = "BBCReader";
 
-    private class RssFeedTask extends AsyncTask<String, Void, String> {
+    private class UrlDownloaderTask extends AsyncTask<String, Void, String> {
 
         private Context context;
 
-        public RssFeedTask(Context context) {
+        public UrlDownloaderTask(Context context) {
             this.context = context;
         }
 
@@ -139,7 +144,7 @@ public class BBCReaderActivity extends Activity {
             }
             finally {
                 if (conn != null) {
-                      conn.disconnect();
+                    conn.disconnect();
                 }
             }
         }
@@ -155,7 +160,7 @@ public class BBCReaderActivity extends Activity {
                 final BaseAdapter adapter = new ArticleAdapter(context, articles);
                 final ListView l = (ListView) findViewById(android.R.id.list);
                 l.setAdapter(adapter);
-                l.setOnItemClickListener( new OnItemClickListener() {
+                l.setOnItemClickListener(new OnItemClickListener() {
                     @Override
                     public void onItemClick(AdapterView<?> parent, View v, int position, long id) {
                         final HashMap<String, String> article = articles.get(position);
@@ -177,6 +182,6 @@ public class BBCReaderActivity extends Activity {
         setContentView(R.layout.main);
         // Get the RSS feed asynchronously
         String url = "http://feeds.bbci.co.uk/news/world/asia/rss.xml";
-        new RssFeedTask(this).execute(url);
+        new UrlDownloaderTask(this).execute(url);
     }
 }
