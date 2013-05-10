@@ -69,10 +69,12 @@ public class ArticleAdapter extends BaseAdapter {
 
     private final Context context;
     private final ArrayList<HashMap<String, String>> articles;
+    private final LayoutInflater inflater;
 
     public ArticleAdapter(Context context, ArrayList<HashMap<String, String>> articles) {
         this.context = context;
         this.articles = articles;
+        inflater = (LayoutInflater) context.getSystemService(Activity.LAYOUT_INFLATER_SERVICE);
     }
 
     @Override
@@ -87,17 +89,15 @@ public class ArticleAdapter extends BaseAdapter {
 
     @Override
     public long getItemId(int position) {
-        return articles.indexOf(getItem(position));
+        return position;
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public View getView(int position, View convertView, ViewGroup parent) {
-        LayoutInflater mInflater = (LayoutInflater)
-                        context.getSystemService(Activity.LAYOUT_INFLATER_SERVICE);
         ViewHolder holder = null;
         if(convertView == null) {
-            convertView = mInflater.inflate(R.layout.article, null);
+            convertView = inflater.inflate(R.layout.article, null);
             holder = new ViewHolder();
             holder.titleText = (TextView) convertView.findViewById(R.id.title);
             holder.descriptionText = (TextView) convertView.findViewById(R.id.description);
