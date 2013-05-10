@@ -1,5 +1,6 @@
 package com.salquestfl.bbcreader;
 
+import java.lang.ref.WeakReference;
 import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
@@ -11,12 +12,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.net.URL;
 import java.net.HttpURLConnection;
-import java.util.concurrent.Future;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
 
 import android.app.Activity;
-import android.content.Intent;
 import android.content.Context;
 import android.view.View;
 import android.view.ViewGroup;
@@ -26,52 +23,56 @@ import android.graphics.Bitmap;
 import android.widget.TextView;
 import android.widget.ImageView;
 import android.widget.ListView;
-import android.widget.AdapterView;
 import android.widget.BaseAdapter;
-import android.widget.Toast;
-import android.widget.AdapterView.OnItemClickListener;
-import android.os.Bundle;
 import android.util.Log;
 import android.net.Uri;
 import android.os.AsyncTask;
 
 
+class BitmapWorkerTask extends AsyncTask<String, Void, Bitmap> {
+    private final WeakReference<ImageView> imageViewReference;
+
+    public BitmapWorkerTask(ImageView imageView) {
+        // Use a WeakReference to ensure the ImageView can be garbage collected
+        imageViewReference = new WeakReference<ImageView>(imageView);
+    }
+
+    // Download image in background.
+    @Override
+    protected Bitmap doInBackground(String... params) {
+        String thumbnailUri = params[0];
+        try {
+            return BitmapFactory.decodeStream(new URL(thumbnailUri).openConnection().getInputStream());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+    // Once complete, see if ImageView is still around and set bitmap.
+    @Override
+    protected void onPostExecute(Bitmap bitmap) {
+        if (imageViewReference != null && bitmap != null) {
+            final ImageView imageView = imageViewReference.get();
+            if (imageView != null) {
+                imageView.setImageBitmap(bitmap);
+            }
+        }
+    }
+}
 
 public class ArticleAdapter extends BaseAdapter { 
 
     private static class ViewHolder {
-        TextView title_text;
-        TextView description_text;
-        ImageView thumbnail_image;
+        TextView titleText;
+        TextView descriptionText;
+        ImageView thumbnailImage;
     }
 
     private final Context context;
     private final ArrayList<HashMap<String, String>> articles;
-    private final HashMap<String, Future<Bitmap>> bitmapFutures;
-    private final ExecutorService pool;
 
-    public ArticleAdapter(final Context context, ArrayList<HashMap<String, String>> articles, ExecutorService pool) {
+    public ArticleAdapter(Context context, ArrayList<HashMap<String, String>> articles) {
         this.context = context;
         this.articles = articles;
-        this.pool = pool;
-        bitmapFutures = new HashMap<String, Future<Bitmap>>();
-        for (final HashMap<String, String> article : articles) {
-            final String thumbnail_uri = article.get("thumbnail");
-            if (thumbnail_uri != null) {
-                 Callable callable = new Callable() {
-                     public Bitmap call() {
-                         try {
-                             return BitmapFactory.decodeStream(new URL(thumbnail_uri).openConnection().getInputStream());
-                         } catch (Exception e) {
-                             // Just absorb the image download error
-                             return null;
-                         }
-                     }
-                 };
-                 Future<Bitmap> future = pool.submit(callable);
-                 bitmapFutures.put(thumbnail_uri, future);
-            }
-        }
     }
 
     @Override
@@ -91,16 +92,16 @@ public class ArticleAdapter extends BaseAdapter {
 
     @SuppressWarnings("unchecked")
     @Override
-    public View getView(final int position, View convertView, ViewGroup parent) {
+    public View getView(int position, View convertView, ViewGroup parent) {
         LayoutInflater mInflater = (LayoutInflater)
                         context.getSystemService(Activity.LAYOUT_INFLATER_SERVICE);
         ViewHolder holder = null;
         if(convertView == null) {
             convertView = mInflater.inflate(R.layout.article, null);
             holder = new ViewHolder();
-            holder.title_text = (TextView) convertView.findViewById(R.id.title);
-            holder.description_text = (TextView) convertView.findViewById(R.id.description);
-            holder.thumbnail_image = (ImageView) convertView.findViewById(R.id.thumbnail);
+            holder.titleText = (TextView) convertView.findViewById(R.id.title);
+            holder.descriptionText = (TextView) convertView.findViewById(R.id.description);
+            holder.thumbnailImage = (ImageView) convertView.findViewById(R.id.thumbnail);
             convertView.setTag(holder);
         }
         else {
@@ -108,19 +109,15 @@ public class ArticleAdapter extends BaseAdapter {
         }
         final HashMap<String, String> article = (HashMap<String, String>) getItem(position);
         String title = article.get("title");
-        holder.title_text.setText(title);
+        holder.titleText.setText(title);
         String description = article.get("description");
-        holder.description_text.setText(description);
-        String thumbnail_uri = article.get("thumbnail");
-        Bitmap thumbnail = null;
-        if (thumbnail_uri != null) {
-            Future<Bitmap> future = bitmapFutures.get(thumbnail_uri);
-            try {
-                thumbnail = future.get();
-            } catch (Exception e) {
-            }
+        holder.descriptionText.setText(description);
+        String thumbnailUri = article.get("thumbnail");
+        if (thumbnailUri != null) {
+            new BitmapWorkerTask(holder.thumbnailImage).execute(thumbnailUri);
+        } else {
+            holder.thumbnailImage.setImageBitmap(null);
         }
-        holder.thumbnail_image.setImageBitmap(thumbnail);
         return convertView;
     }
 }
