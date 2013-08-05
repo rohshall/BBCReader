@@ -10,6 +10,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 
 import android.app.Activity;
+import android.app.ProgressDialog;
 import android.content.Intent;
 import android.content.Context;
 import android.view.View;
@@ -29,9 +30,21 @@ class RssReaderTask extends AsyncTask<String, Void, ArrayList<HashMap<String, St
     private static final String TAG = "BBCReader";
 
     private Activity activity;
+    private ProgressDialog progressDialog;
 
     public RssReaderTask(Activity activity) {
         this.activity = activity;
+    }
+
+   @Override
+    protected void onPreExecute() {
+      super.onPreExecute();
+      progressDialog = new ProgressDialog(activity);
+      progressDialog.setCancelable(false);
+      progressDialog.setMessage("Downloading articles, please wait...");
+      progressDialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
+      progressDialog.setProgress(0);
+      progressDialog.show();
     }
 
     // This executes in non-UI thread. No UI calls from here (including Toast)
@@ -42,7 +55,7 @@ class RssReaderTask extends AsyncTask<String, Void, ArrayList<HashMap<String, St
             URL url = new URL(urls[0]);
             conn = (HttpURLConnection) url.openConnection();
             BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-            return RssReader.read(in);
+            return new RssReader().read(in);
         } catch (Exception e) {
             Log.w(TAG, e.toString());
             return null;
@@ -57,6 +70,8 @@ class RssReaderTask extends AsyncTask<String, Void, ArrayList<HashMap<String, St
     // This executes in UI thread
     @Override
     protected void onPostExecute(final ArrayList<HashMap<String, String>> articles) {
+        super.onPostExecute(articles);
+        progressDialog.dismiss();
         if (articles == null) {
             String msg = "Could not connect to the server. Please try again after some time.";
             Log.w(TAG, msg);
